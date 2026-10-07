@@ -45,7 +45,7 @@ export default function RegisterScreen({ navigation }) {
         createdAt: serverTimestamp(),
       });
 
-      navigation.replace("Home");
+    navigation.replace("Pin");
     } catch (error) {
       let msg = "Error al registrar";
       if (error.code === "auth/email-already-in-use") msg = "Este correo ya está registrado";

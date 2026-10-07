@@ -8,6 +8,7 @@ import HomeScreen from "./screens/Home/HomeScreen";
 import TransferScreen from "./screens/Transfer/TransferScreen";
 import HistoryScreen from "./screens/History/HistoryScreen";
 import ProfileScreen from "./screens/Profile/ProfileScreen";
+import PinScreen from "./screens/Auth/PinScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -21,6 +22,7 @@ export default function Navigation() {
         {/* Auth */}
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="Pin" component={PinScreen} />
 
         {/* App */}
         <Stack.Screen name="Home" component={HomeScreen} />
