@@ -27,7 +27,7 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
-      navigation.replace("Home");
+    navigation.replace("Pin");
     } catch (error) {
       let msg = "Error al iniciar sesión";
       if (error.code === "auth/user-not-found") msg = "Usuario no encontrado";

@@ -5,6 +5,7 @@ import {
 } from "react-native";
 import { collection, query, where, getDocs, doc, runTransaction, addDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
+import { isBiometricAvailable, authenticateWithBiometrics } from "../../utils/biometrics";
 
 export default function TransferScreen({ navigation }) {
   const [recipientEmail, setRecipientEmail] = useState("");
@@ -29,6 +30,16 @@ export default function TransferScreen({ navigation }) {
     if (recipientEmail.trim() === senderEmail) {
       Alert.alert("Error", "No puedes transferirte a ti mismo");
       return;
+    }
+
+    // Confirmación biométrica antes de transferir
+    const bioAvailable = await isBiometricAvailable();
+    if (bioAvailable) {
+      const success = await authenticateWithBiometrics();
+      if (!success) {
+        Alert.alert("Error", "Autenticación biométrica fallida. Transferencia cancelada.");
+        return;
+      }
     }
 
     setLoading(true);
