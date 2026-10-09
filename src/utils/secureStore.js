@@ -1,13 +1,25 @@
 import * as SecureStore from "expo-secure-store";
 
-export async function savePin(pin) {
-  await SecureStore.setItem("user_pin", pin);
-}
-
-export async function getPin() {
-  return SecureStore.getItem("user_pin");
-}
-
-export async function deletePin() {
-  await SecureStore.deleteItem("user_pin");
-}
+export const secureStore = {
+  setItem: async (key, value) => {
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch {
+      await SecureStore.setItem(key, value);
+    }
+  },
+  getItem: async (key) => {
+    try {
+      return await SecureStore.getItemAsync(key);
+    } catch {
+      return SecureStore.getItem(key);
+    }
+  },
+  deleteItem: async (key) => {
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch {
+      await SecureStore.deleteItem(key);
+    }
+  },
+};
