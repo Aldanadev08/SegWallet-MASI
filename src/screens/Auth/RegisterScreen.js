@@ -51,6 +51,7 @@ export default function RegisterScreen({ navigation }) {
       await setDoc(doc(db, "wallets", uid), {
         balance: 1000.0,
         currency: "GTQ",
+        locked: false,
         createdAt: serverTimestamp(),
       });
       navigation.replace("Pin");

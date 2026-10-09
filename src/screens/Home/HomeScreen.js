@@ -18,6 +18,7 @@ export default function HomeScreen({ navigation }) {
   const [showBalance, setShowBalance] = useState(true);
   const [recentTx, setRecentTx] = useState([]);
   const [pendingRequests, setPendingRequests] = useState(0);
+  const [walletLocked, setWalletLocked] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const uid = auth.currentUser?.uid;
@@ -25,7 +26,10 @@ export default function HomeScreen({ navigation }) {
   useEffect(() => {
     if (!uid) return;
     const unsubWallet = onSnapshot(doc(db, "wallets", uid), (snap) => {
-      if (snap.exists()) setBalance(snap.data().balance || 0);
+      if (snap.exists()) {
+        setBalance(snap.data().balance || 0);
+        setWalletLocked(!!snap.data().locked);
+      }
     });
     const unsubUser = onSnapshot(doc(db, "users", uid), (snap) => {
       if (snap.exists()) setUserName(snap.data().name || "");
@@ -70,17 +74,12 @@ export default function HomeScreen({ navigation }) {
       { text: "Cancelar", style: "cancel" },
       {
         text: "Salir", style: "destructive",
-        onPress: async () => {
-          await signOut(auth);
-          navigation.replace("Login");
-        },
+        onPress: async () => { await signOut(auth); navigation.replace("Login"); },
       },
     ]);
   };
 
-  const initials = userName
-    .split(" ").slice(0, 2).map((n) => n[0]?.toUpperCase()).join("");
-
+  const initials = userName.split(" ").slice(0, 2).map(n => n[0]?.toUpperCase()).join("");
   const formatMoney = (n) =>
     "Q " + Number(n).toLocaleString("es-GT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -115,19 +114,24 @@ export default function HomeScreen({ navigation }) {
         {/* Balance Card */}
         <View style={styles.balanceCardWrapper}>
           <LinearGradient
-            colors={["#00D4AA", "#00A383"]}
+            colors={walletLocked ? ["#555", "#333"] : ["#00D4AA", "#00A383"]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={styles.balanceCard}
           >
             <View style={styles.cardDecor1} />
             <View style={styles.cardDecor2} />
+
+            {walletLocked && (
+              <View style={styles.lockedOverlay}>
+                <Ionicons name="lock-closed" size={14} color={COLORS.bgPrimary} />
+                <Text style={styles.lockedText}>BLOQUEADA</Text>
+              </View>
+            )}
+
             <View style={styles.balanceHeader}>
               <Text style={styles.balanceLabel}>Saldo disponible</Text>
               <TouchableOpacity onPress={() => setShowBalance(!showBalance)}>
-                <Ionicons
-                  name={showBalance ? "eye-outline" : "eye-off-outline"}
-                  size={20} color={COLORS.bgPrimary}
-                />
+                <Ionicons name={showBalance ? "eye-outline" : "eye-off-outline"} size={20} color={COLORS.bgPrimary} />
               </TouchableOpacity>
             </View>
             <Text style={styles.balanceAmount}>
@@ -146,7 +150,7 @@ export default function HomeScreen({ navigation }) {
           </LinearGradient>
         </View>
 
-        {/* Actions - fila 1 */}
+        {/* Actions fila 1 */}
         <View style={styles.actionsRow}>
           <ActionButton icon="arrow-up" label="Enviar" color={COLORS.accent}
             onPress={() => navigation.navigate("Transfer")} />
@@ -158,19 +162,20 @@ export default function HomeScreen({ navigation }) {
             onPress={() => navigation.navigate("Request")} />
         </View>
 
-        {/* Actions - fila 2 */}
+        {/* Actions fila 2 */}
         <View style={[styles.actionsRow, { marginTop: SPACING.md }]}>
           <ActionButton icon="time" label="Historial" color="#4A90D9"
             onPress={() => navigation.navigate("History")} />
           <ActionButton icon="list" label="Solicitudes" color="#F96167"
             badge={pendingRequests}
             onPress={() => navigation.navigate("RequestsList")} />
+          <ActionButton icon="people" label="Contactos" color="#F9E795"
+            onPress={() => navigation.navigate("Contacts")} />
           <ActionButton icon="person" label="Perfil" color="#00D4AA"
             onPress={() => navigation.navigate("Profile")} />
-          <View style={styles.action} />
         </View>
 
-        {/* Recent Transactions */}
+        {/* Recent */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Movimientos recientes</Text>
@@ -178,19 +183,17 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.sectionLink}>Ver todos</Text>
             </TouchableOpacity>
           </View>
-
           {recentTx.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="receipt-outline" size={40} color={COLORS.textMuted} />
               <Text style={styles.emptyText}>Aún no tienes movimientos</Text>
             </View>
           ) : (
-            recentTx.map((tx) => {
+            recentTx.map(tx => {
               const sent = tx.senderId === uid;
               return (
                 <View key={tx.id} style={styles.txRow}>
-                  <View style={[styles.txIcon,
-                    { backgroundColor: sent ? "rgba(249, 97, 103, 0.15)" : "rgba(0, 212, 170, 0.15)" }]}>
+                  <View style={[styles.txIcon, { backgroundColor: sent ? "rgba(249, 97, 103, 0.15)" : "rgba(0, 212, 170, 0.15)" }]}>
                     <Ionicons name={sent ? "arrow-up" : "arrow-down"} size={18}
                       color={sent ? COLORS.danger : COLORS.accent} />
                   </View>
@@ -238,7 +241,6 @@ function ActionButton({ icon, label, color, onPress, badge }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bgPrimary, paddingTop: 50 },
-
   topBar: {
     flexDirection: "row", alignItems: "center",
     paddingHorizontal: SPACING.lg, marginBottom: SPACING.lg,
@@ -278,6 +280,14 @@ const styles = StyleSheet.create({
     position: "absolute", width: 120, height: 120, borderRadius: 60,
     backgroundColor: "rgba(255,255,255,0.08)", bottom: -40, left: -30,
   },
+  lockedOverlay: {
+    position: "absolute", top: 12, right: 12,
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.9)", zIndex: 2,
+  },
+  lockedText: { color: COLORS.bgPrimary, fontSize: 10, fontWeight: "800", letterSpacing: 1 },
+
   balanceHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   balanceLabel: { color: COLORS.bgPrimary, fontSize: FONT.sm, fontWeight: "600", opacity: 0.8 },
   balanceAmount: {

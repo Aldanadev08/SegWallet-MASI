@@ -7,7 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import {
   collection, query, where, orderBy, getDocs, doc,
-  runTransaction, updateDoc, serverTimestamp, addDoc,
+  runTransaction, updateDoc, serverTimestamp, addDoc, getDoc,
 } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
 import { authenticateBiometric } from "../../utils/biometrics";
@@ -54,6 +54,20 @@ export default function RequestsListScreen({ navigation }) {
     "Q " + Number(n).toLocaleString("es-GT", { minimumFractionDigits: 2 });
 
   const handleAccept = async (req) => {
+    // Validar bloqueo de wallet antes de pagar
+    const walletSnap = await getDoc(doc(db, "wallets", uid));
+    if (walletSnap.exists() && walletSnap.data().locked) {
+      Alert.alert(
+        "🔒 Billetera bloqueada",
+        "Desbloquea tu billetera desde el Perfil para pagar solicitudes",
+        [
+          { text: "Ir al perfil", onPress: () => navigation.navigate("Profile") },
+          { text: "Cancelar", style: "cancel" },
+        ]
+      );
+      return;
+    }
+
     const bioOk = await authenticateBiometric("Confirma el pago");
     if (!bioOk) return;
 
@@ -69,6 +83,8 @@ export default function RequestsListScreen({ navigation }) {
         if (!requestSnap.exists() || requestSnap.data().status !== "pending") {
           throw new Error("Solicitud ya procesada");
         }
+        if (payerSnap.data().locked) throw new Error("Tu billetera está bloqueada");
+        if (requesterSnap.data().locked) throw new Error("La billetera del solicitante está bloqueada");
         if (payerSnap.data().balance < req.amount) throw new Error("Saldo insuficiente");
 
         tx.update(payerRef, { balance: payerSnap.data().balance - req.amount });

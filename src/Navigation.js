@@ -14,6 +14,8 @@ import ScanQRScreen from "./screens/QR/ScanQRScreen";
 import ReceiptScreen from "./screens/Receipt/ReceiptScreen";
 import RequestScreen from "./screens/Request/RequestScreen";
 import RequestsListScreen from "./screens/Request/RequestsListScreen";
+import ChangePinScreen from "./screens/Security/ChangePinScreen";
+import ContactsScreen from "./screens/Contacts/ContactsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -36,6 +38,8 @@ export default function Navigation() {
         <Stack.Screen name="Receipt" component={ReceiptScreen} />
         <Stack.Screen name="Request" component={RequestScreen} />
         <Stack.Screen name="RequestsList" component={RequestsListScreen} />
+        <Stack.Screen name="ChangePin" component={ChangePinScreen} />
+        <Stack.Screen name="Contacts" component={ContactsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
