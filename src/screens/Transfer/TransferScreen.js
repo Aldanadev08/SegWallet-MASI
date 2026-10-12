@@ -13,6 +13,7 @@ import { auth, db } from "../../config/firebase";
 import { authenticateBiometric } from "../../utils/biometrics";
 import { isBiometricEnabled } from "../../utils/biometricPref";
 import { COLORS, SPACING, FONT } from "../../theme/colors";
+import ConfirmModal from "../../components/ConfirmModal";
 
 export default function TransferScreen({ navigation, route }) {
   const [recipientEmail, setRecipientEmail] = useState("");
@@ -22,6 +23,7 @@ export default function TransferScreen({ navigation, route }) {
   const [fromQR, setFromQR] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [walletLocked, setWalletLocked] = useState(false);
+  const [lockedWarning, setLockedWarning] = useState(false);
 
   const uid = auth.currentUser?.uid;
   const quickAmounts = [50, 100, 250, 500];
@@ -78,11 +80,7 @@ export default function TransferScreen({ navigation, route }) {
 
   const handleTransfer = async () => {
     if (walletLocked) {
-      Alert.alert(
-        "🔒 Billetera bloqueada",
-        "Desbloquea tu billetera desde el Perfil para hacer transferencias",
-        [{ text: "Ir al perfil", onPress: () => navigation.navigate("Profile") }, { text: "Cancelar" }]
-      );
+      setLockedWarning(true);
       return;
     }
 
@@ -96,7 +94,6 @@ export default function TransferScreen({ navigation, route }) {
       return;
     }
 
-    // Biometría solo si está activada
     const bioOn = await isBiometricEnabled(uid);
     if (bioOn) {
       const bioOk = await authenticateBiometric("Confirma la transferencia");
@@ -210,7 +207,6 @@ export default function TransferScreen({ navigation, route }) {
             </View>
           )}
 
-          {/* Contactos frecuentes */}
           {contacts.length > 0 && (
             <View style={styles.contactsSection}>
               <View style={styles.contactsHeader}>
@@ -318,6 +314,18 @@ export default function TransferScreen({ navigation, route }) {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ConfirmModal
+        visible={lockedWarning}
+        type="warning"
+        icon="lock-closed"
+        title="Billetera bloqueada"
+        message="Tu billetera está bloqueada. Desbloquéala desde tu perfil para hacer transferencias."
+        confirmText="Ir al perfil"
+        cancelText="Más tarde"
+        onCancel={() => setLockedWarning(false)}
+        onConfirm={() => { setLockedWarning(false); navigation.navigate("Profile"); }}
+      />
     </View>
   );
 }

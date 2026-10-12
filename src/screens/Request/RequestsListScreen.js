@@ -12,12 +12,15 @@ import {
 import { auth, db } from "../../config/firebase";
 import { authenticateBiometric } from "../../utils/biometrics";
 import { COLORS, SPACING, FONT } from "../../theme/colors";
+import ConfirmModal from "../../components/ConfirmModal";
 
 export default function RequestsListScreen({ navigation }) {
   const [tab, setTab] = useState("received");
   const [received, setReceived] = useState([]);
   const [sent, setSent] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [toReject, setToReject] = useState(null);
+  const [lockedWarning, setLockedWarning] = useState(false);
   const uid = auth.currentUser?.uid;
 
   const load = useCallback(async () => {
@@ -54,17 +57,9 @@ export default function RequestsListScreen({ navigation }) {
     "Q " + Number(n).toLocaleString("es-GT", { minimumFractionDigits: 2 });
 
   const handleAccept = async (req) => {
-    // Validar bloqueo de wallet antes de pagar
     const walletSnap = await getDoc(doc(db, "wallets", uid));
     if (walletSnap.exists() && walletSnap.data().locked) {
-      Alert.alert(
-        "🔒 Billetera bloqueada",
-        "Desbloquea tu billetera desde el Perfil para pagar solicitudes",
-        [
-          { text: "Ir al perfil", onPress: () => navigation.navigate("Profile") },
-          { text: "Cancelar", style: "cancel" },
-        ]
-      );
+      setLockedWarning(true);
       return;
     }
 
@@ -111,20 +106,14 @@ export default function RequestsListScreen({ navigation }) {
     }
   };
 
-  const handleReject = (req) => {
-    Alert.alert("¿Rechazar solicitud?", `Rechazar la solicitud de Q${req.amount.toFixed(2)}`, [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Rechazar", style: "destructive",
-        onPress: async () => {
-          await updateDoc(doc(db, "requests", req.id), {
-            status: "rejected",
-            resolvedAt: serverTimestamp(),
-          });
-          load();
-        }
-      },
-    ]);
+  const confirmReject = async () => {
+    if (!toReject) return;
+    await updateDoc(doc(db, "requests", toReject.id), {
+      status: "rejected",
+      resolvedAt: serverTimestamp(),
+    });
+    setToReject(null);
+    load();
   };
 
   const data = tab === "received" ? received : sent;
@@ -146,11 +135,8 @@ export default function RequestsListScreen({ navigation }) {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.cardAvatar}>
-            <Ionicons
-              name={isReceived ? "arrow-down" : "arrow-up"}
-              size={18}
-              color={COLORS.accent}
-            />
+            <Ionicons name={isReceived ? "arrow-down" : "arrow-up"}
+              size={18} color={COLORS.accent} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardLabel}>
@@ -173,7 +159,7 @@ export default function RequestsListScreen({ navigation }) {
 
           {isReceived && item.status === "pending" && (
             <View style={styles.actionRow}>
-              <TouchableOpacity style={styles.rejectBtn} onPress={() => handleReject(item)}>
+              <TouchableOpacity style={styles.rejectBtn} onPress={() => setToReject(item)}>
                 <Text style={styles.rejectText}>Rechazar</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAccept(item)}>
@@ -203,20 +189,15 @@ export default function RequestsListScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Tabs */}
       <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, tab === "received" && styles.tabActive]}
-          onPress={() => setTab("received")}
-        >
+        <TouchableOpacity style={[styles.tab, tab === "received" && styles.tabActive]}
+          onPress={() => setTab("received")}>
           <Text style={[styles.tabText, tab === "received" && styles.tabTextActive]}>
             Recibidas ({received.filter(r => r.status === "pending").length})
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, tab === "sent" && styles.tabActive]}
-          onPress={() => setTab("sent")}
-        >
+        <TouchableOpacity style={[styles.tab, tab === "sent" && styles.tabActive]}
+          onPress={() => setTab("sent")}>
           <Text style={[styles.tabText, tab === "sent" && styles.tabTextActive]}>
             Enviadas
           </Text>
@@ -238,6 +219,30 @@ export default function RequestsListScreen({ navigation }) {
             </Text>
           </View>
         }
+      />
+
+      <ConfirmModal
+        visible={!!toReject}
+        type="danger"
+        icon="close-circle"
+        title="¿Rechazar solicitud?"
+        message={toReject ? `Vas a rechazar la solicitud de ${formatMoney(toReject.amount)} de ${toReject.requesterName || toReject.requesterEmail}.` : ""}
+        confirmText="Rechazar"
+        cancelText="Cancelar"
+        onCancel={() => setToReject(null)}
+        onConfirm={confirmReject}
+      />
+
+      <ConfirmModal
+        visible={lockedWarning}
+        type="warning"
+        icon="lock-closed"
+        title="Billetera bloqueada"
+        message="Tu billetera está bloqueada. Desbloquéala desde tu perfil para poder pagar solicitudes."
+        confirmText="Ir al perfil"
+        cancelText="Más tarde"
+        onCancel={() => setLockedWarning(false)}
+        onConfirm={() => { setLockedWarning(false); navigation.navigate("Profile"); }}
       />
     </View>
   );
@@ -287,9 +292,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bgInput, borderRadius: 8, marginBottom: SPACING.sm,
   },
 
-  cardFooter: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-  },
+  cardFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   statusBadge: {
     flexDirection: "row", alignItems: "center", gap: 4,
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,

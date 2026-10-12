@@ -11,12 +11,15 @@ import { auth, db } from "../../config/firebase";
 import { isBiometricAvailable, authenticateBiometric } from "../../utils/biometrics";
 import { isBiometricEnabled, setBiometricEnabled } from "../../utils/biometricPref";
 import { COLORS, SPACING, FONT } from "../../theme/colors";
+import ConfirmModal from "../../components/ConfirmModal";
 
 export default function ProfileScreen({ navigation }) {
   const [userData, setUserData] = useState(null);
   const [walletLocked, setWalletLocked] = useState(false);
   const [bioEnabled, setBioEnabled] = useState(false);
   const [bioAvailable, setBioAvailable] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showLockModal, setShowLockModal] = useState(false);
 
   const uid = auth.currentUser?.uid;
 
@@ -34,14 +37,10 @@ export default function ProfileScreen({ navigation }) {
     return () => unsub();
   }, []);
 
-  const handleLogout = () => {
-    Alert.alert("Cerrar sesión", "¿Seguro que querés salir?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Salir", style: "destructive",
-        onPress: async () => { await signOut(auth); navigation.replace("Login"); },
-      },
-    ]);
+  const handleLogout = async () => {
+    setShowLogoutModal(false);
+    await signOut(auth);
+    navigation.replace("Login");
   };
 
   const handleToggleBio = async (val) => {
@@ -57,26 +56,13 @@ export default function ProfileScreen({ navigation }) {
     setBioEnabled(val);
   };
 
-  const handleToggleLock = async () => {
-    const action = walletLocked ? "desbloquear" : "bloquear";
-    const confirmTitle = walletLocked ? "¿Desbloquear billetera?" : "¿Bloquear billetera?";
-    const confirmMsg = walletLocked
-      ? "Podrás enviar y recibir dinero de nuevo"
-      : "No podrás enviar ni pagar solicitudes hasta desbloquearla";
-
-    Alert.alert(confirmTitle, confirmMsg, [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: walletLocked ? "Desbloquear" : "Bloquear",
-        style: walletLocked ? "default" : "destructive",
-        onPress: async () => {
-          const bioOk = await authenticateBiometric(`Confirma para ${action}`);
-          if (!bioOk && bioEnabled) return;
-          await updateDoc(doc(db, "wallets", uid), { locked: !walletLocked });
-          Alert.alert("✓ Listo", `Billetera ${walletLocked ? "desbloqueada" : "bloqueada"}`);
-        },
-      },
-    ]);
+  const confirmToggleLock = async () => {
+    setShowLockModal(false);
+    const bioOk = await authenticateBiometric(
+      walletLocked ? "Confirma para desbloquear" : "Confirma para bloquear"
+    );
+    if (!bioOk && bioEnabled) return;
+    await updateDoc(doc(db, "wallets", uid), { locked: !walletLocked });
   };
 
   const initials = (userData?.name || "U")
@@ -96,7 +82,6 @@ export default function ProfileScreen({ navigation }) {
           <View style={{ width: 44 }} />
         </View>
 
-        {/* Avatar */}
         <View style={styles.avatarSection}>
           <LinearGradient colors={COLORS.gradientAccent} style={styles.avatarWrapper}>
             <Text style={styles.avatarText}>{initials}</Text>
@@ -109,7 +94,6 @@ export default function ProfileScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Wallet status */}
         {walletLocked && (
           <View style={styles.lockBanner}>
             <Ionicons name="lock-closed" size={20} color={COLORS.warning} />
@@ -120,7 +104,6 @@ export default function ProfileScreen({ navigation }) {
           </View>
         )}
 
-        {/* Account info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Información</Text>
           <InfoRow icon="mail-outline" label="Correo" value={userData?.email || auth.currentUser?.email} />
@@ -128,7 +111,6 @@ export default function ProfileScreen({ navigation }) {
           <InfoRow icon="globe-outline" label="Moneda" value="GTQ (Quetzales)" />
         </View>
 
-        {/* Security section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Seguridad</Text>
 
@@ -163,25 +145,17 @@ export default function ProfileScreen({ navigation }) {
             />
           </View>
 
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={handleToggleLock}
-          >
+          <TouchableOpacity style={styles.settingRow} onPress={() => setShowLockModal(true)}>
             <View style={[styles.settingIcon, walletLocked && { backgroundColor: "rgba(255, 153, 0, 0.15)" }]}>
-              <Ionicons
-                name={walletLocked ? "lock-closed" : "lock-open"}
-                size={18}
-                color={walletLocked ? COLORS.warning : COLORS.accent}
-              />
+              <Ionicons name={walletLocked ? "lock-closed" : "lock-open"}
+                size={18} color={walletLocked ? COLORS.warning : COLORS.accent} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.settingLabel}>
                 {walletLocked ? "Desbloquear billetera" : "Bloquear billetera"}
               </Text>
               <Text style={styles.settingDesc}>
-                {walletLocked
-                  ? "Reactiva envíos y pagos"
-                  : "Impide transferencias si pierdes el teléfono"}
+                {walletLocked ? "Reactiva envíos y pagos" : "Impide transferencias si pierdes el teléfono"}
               </Text>
             </View>
             <View style={[styles.statusBadge, {
@@ -198,7 +172,6 @@ export default function ProfileScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* App section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Aplicación</Text>
           <TouchableOpacity style={styles.settingRow} onPress={() => navigation.navigate("Contacts")}>
@@ -217,11 +190,37 @@ export default function ProfileScreen({ navigation }) {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={() => setShowLogoutModal(true)}>
           <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
           <Text style={styles.logoutText}>Cerrar sesión</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <ConfirmModal
+        visible={showLogoutModal}
+        type="danger"
+        icon="log-out-outline"
+        title="Cerrar sesión"
+        message="¿Seguro que querés salir de SegWallet?"
+        confirmText="Salir"
+        cancelText="Quedarme"
+        onCancel={() => setShowLogoutModal(false)}
+        onConfirm={handleLogout}
+      />
+
+      <ConfirmModal
+        visible={showLockModal}
+        type={walletLocked ? "success" : "warning"}
+        icon={walletLocked ? "lock-open" : "lock-closed"}
+        title={walletLocked ? "¿Desbloquear billetera?" : "¿Bloquear billetera?"}
+        message={walletLocked
+          ? "Podrás volver a enviar y recibir dinero."
+          : "No podrás enviar ni pagar solicitudes hasta desbloquearla desde este mismo perfil."}
+        confirmText={walletLocked ? "Desbloquear" : "Bloquear"}
+        cancelText="Cancelar"
+        onCancel={() => setShowLockModal(false)}
+        onConfirm={confirmToggleLock}
+      />
     </View>
   );
 }

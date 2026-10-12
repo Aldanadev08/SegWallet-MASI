@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  Alert, StatusBar, RefreshControl,
+  StatusBar, RefreshControl,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,6 +11,7 @@ import {
 import { signOut } from "firebase/auth";
 import { auth, db } from "../../config/firebase";
 import { COLORS, SPACING, FONT } from "../../theme/colors";
+import ConfirmModal from "../../components/ConfirmModal";
 
 export default function HomeScreen({ navigation }) {
   const [balance, setBalance] = useState(0);
@@ -20,6 +21,7 @@ export default function HomeScreen({ navigation }) {
   const [pendingRequests, setPendingRequests] = useState(0);
   const [walletLocked, setWalletLocked] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const uid = auth.currentUser?.uid;
 
@@ -69,14 +71,10 @@ export default function HomeScreen({ navigation }) {
     setRefreshing(false);
   };
 
-  const handleLogout = () => {
-    Alert.alert("Cerrar sesión", "¿Seguro que querés salir?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Salir", style: "destructive",
-        onPress: async () => { await signOut(auth); navigation.replace("Login"); },
-      },
-    ]);
+  const handleLogout = async () => {
+    setShowLogoutModal(false);
+    await signOut(auth);
+    navigation.replace("Login");
   };
 
   const initials = userName.split(" ").slice(0, 2).map(n => n[0]?.toUpperCase()).join("");
@@ -111,7 +109,6 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Balance Card */}
         <View style={styles.balanceCardWrapper}>
           <LinearGradient
             colors={walletLocked ? ["#555", "#333"] : ["#00D4AA", "#00A383"]}
@@ -120,14 +117,12 @@ export default function HomeScreen({ navigation }) {
           >
             <View style={styles.cardDecor1} />
             <View style={styles.cardDecor2} />
-
             {walletLocked && (
               <View style={styles.lockedOverlay}>
                 <Ionicons name="lock-closed" size={14} color={COLORS.bgPrimary} />
                 <Text style={styles.lockedText}>BLOQUEADA</Text>
               </View>
             )}
-
             <View style={styles.balanceHeader}>
               <Text style={styles.balanceLabel}>Saldo disponible</Text>
               <TouchableOpacity onPress={() => setShowBalance(!showBalance)}>
@@ -150,7 +145,6 @@ export default function HomeScreen({ navigation }) {
           </LinearGradient>
         </View>
 
-        {/* Actions fila 1 */}
         <View style={styles.actionsRow}>
           <ActionButton icon="arrow-up" label="Enviar" color={COLORS.accent}
             onPress={() => navigation.navigate("Transfer")} />
@@ -162,7 +156,6 @@ export default function HomeScreen({ navigation }) {
             onPress={() => navigation.navigate("Request")} />
         </View>
 
-        {/* Actions fila 2 */}
         <View style={[styles.actionsRow, { marginTop: SPACING.md }]}>
           <ActionButton icon="time" label="Historial" color="#4A90D9"
             onPress={() => navigation.navigate("History")} />
@@ -175,7 +168,6 @@ export default function HomeScreen({ navigation }) {
             onPress={() => navigation.navigate("Profile")} />
         </View>
 
-        {/* Recent */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Movimientos recientes</Text>
@@ -214,11 +206,23 @@ export default function HomeScreen({ navigation }) {
           )}
         </View>
 
-        <TouchableOpacity style={styles.logoutRow} onPress={handleLogout}>
+        <TouchableOpacity style={styles.logoutRow} onPress={() => setShowLogoutModal(true)}>
           <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
           <Text style={styles.logoutText}>Cerrar sesión</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <ConfirmModal
+        visible={showLogoutModal}
+        type="danger"
+        icon="log-out-outline"
+        title="Cerrar sesión"
+        message="¿Seguro que querés salir de SegWallet?"
+        confirmText="Salir"
+        cancelText="Quedarme"
+        onCancel={() => setShowLogoutModal(false)}
+        onConfirm={handleLogout}
+      />
     </View>
   );
 }

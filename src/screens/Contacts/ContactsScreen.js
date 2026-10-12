@@ -1,18 +1,20 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity, StatusBar,
-  TextInput, Alert, RefreshControl,
+  TextInput, RefreshControl,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { collection, getDocs, deleteDoc, doc, orderBy, query } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
 import { COLORS, SPACING, FONT } from "../../theme/colors";
+import ConfirmModal from "../../components/ConfirmModal";
 
 export default function ContactsScreen({ navigation }) {
   const [contacts, setContacts] = useState([]);
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [toDelete, setToDelete] = useState(null);
   const uid = auth.currentUser?.uid;
 
   const load = useCallback(async () => {
@@ -34,17 +36,11 @@ export default function ContactsScreen({ navigation }) {
     setRefreshing(false);
   };
 
-  const handleDelete = (contact) => {
-    Alert.alert("¿Eliminar contacto?", `Eliminar a ${contact.name || contact.email}`, [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Eliminar", style: "destructive",
-        onPress: async () => {
-          await deleteDoc(doc(db, "users", uid, "contacts", contact.id));
-          load();
-        },
-      },
-    ]);
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    await deleteDoc(doc(db, "users", uid, "contacts", toDelete.id));
+    setToDelete(null);
+    load();
   };
 
   const handleTransfer = (contact) => {
@@ -88,7 +84,7 @@ export default function ContactsScreen({ navigation }) {
         <TouchableOpacity style={styles.actionBtn} onPress={() => handleTransfer(item)}>
           <Ionicons name="arrow-up" size={18} color={COLORS.accent} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtnDanger} onPress={() => handleDelete(item)}>
+        <TouchableOpacity style={styles.actionBtnDanger} onPress={() => setToDelete(item)}>
           <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
         </TouchableOpacity>
       </View>
@@ -108,7 +104,6 @@ export default function ContactsScreen({ navigation }) {
         <View style={{ width: 44 }} />
       </View>
 
-      {/* Search */}
       <View style={styles.searchWrapper}>
         <Ionicons name="search" size={18} color={COLORS.textMuted} />
         <TextInput
@@ -146,6 +141,18 @@ export default function ContactsScreen({ navigation }) {
             </Text>
           </View>
         }
+      />
+
+      <ConfirmModal
+        visible={!!toDelete}
+        type="danger"
+        icon="trash-outline"
+        title="¿Eliminar contacto?"
+        message={toDelete ? `Vas a eliminar a ${toDelete.name || toDelete.email} de tus contactos. Podrás volver a agregarlo haciendo una nueva transferencia.` : ""}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        onCancel={() => setToDelete(null)}
+        onConfirm={confirmDelete}
       />
     </View>
   );
