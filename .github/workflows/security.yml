@@ -1,0 +1,111 @@
+name: Security Pipeline - SegWallet
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  schedule:
+    # Correr todos los lunes a las 9am UTC
+    - cron: '0 9 * * 1'
+
+jobs:
+  # ========== SCA: npm audit ==========
+  npm-audit:
+    name: SCA - npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: Generate npm audit report
+        run: npm audit --json > npm-audit-report.json
+        continue-on-error: true
+
+      - name: Upload npm audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: npm-audit-report.json
+
+  # ========== SCA: OWASP Dependency-Check ==========
+  dependency-check:
+    name: SCA - OWASP Dependency-Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'SegWallet'
+          path: '.'
+          format: 'HTML'
+          out: 'reports'
+          args: >
+            --enableExperimental
+            --disableYarnAudit
+            --nvdApiKey ${{ secrets.NVD_API_KEY }}
+
+      - name: Upload Dependency-Check report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-check-report
+          path: reports
+
+  # ========== SCA: Snyk ==========
+  snyk:
+    name: SCA - Snyk
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Snyk to check vulnerabilities
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+  # ========== Secrets: Gitleaks ==========
+  secrets-scan:
+    name: Secrets - Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ========== Resumen ==========
+  security-summary:
+    name: Security Gate
+    runs-on: ubuntu-latest
+    needs: [npm-audit, dependency-check, snyk, secrets-scan]
+    if: always()
+    steps:
+      - name: Security checks completed
+        run: |
+          echo "✅ Pipeline de seguridad ejecutado"
+          echo "Revisar reportes en Artifacts"
